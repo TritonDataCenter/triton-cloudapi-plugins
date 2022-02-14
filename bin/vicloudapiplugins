@@ -1,0 +1,67 @@
+#!/bin/bash
+
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+# Copyright 2021 Joyent, Inc.
+
+PATH=/opt/smartdc/bin:$PATH
+
+service=cloudapi
+
+usage() {
+    printf '%s [-D]\n\n' "${0##*/}"
+    printf '\t-D\tEdit sdc-docker plugins instead of cloudapi\n'
+    exit "${1:-1}"
+}
+
+while getopts "D" options; do
+    case $options in
+        D )
+            service=docker ;;
+        * )
+            usage 1
+            ;;
+    esac
+done
+
+if [[ -n "$TRACE" ]]; then
+        export PS4='[\D{%FT%TZ}] ${BASH_SOURCE}:${LINENO}: ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
+        set -o xtrace
+fi
+
+service_uuid=$(sdc-sapi "/services?name=${service}" | json -Ha uuid)
+
+do_diff() {
+    diff -u <(json -q -f "$tmp_plugins_old") <(json -f "$tmp_plugins_new") >&2
+}
+
+do_edit() {
+    vi "$tmp_plugins_new"
+    if json -n -f "$tmp_plugins_new"; then
+        update="$(json -o json-0 -e "this.update = {metadata:{CLOUDAPI_PLUGINS: JSON.stringify($(cat $tmp_plugins_new))}}" update <<< '{}')"
+
+        # Show update command only if there are differences.
+        do_diff || show_update_cmd
+    else
+        printf 'Press any key to resume editing.\n'
+        printf 'Press ^C to quit.\n'
+        read -r
+        do_edit
+    fi
+}
+
+show_update_cmd() {
+    printf '\nNow run this:\n\n\t'
+    printf 'sdc-sapi /services/%s -X PUT -d '\''%s'\''\n\n' "$service" "$update"
+}
+
+tmp_plugins_old=$(mktemp "/tmp/${service}_plugins.json.XXXXXX")
+tmp_plugins_new=$(mktemp "/tmp/${service}_plugins.json.XXXXXX")
+
+sdc-sapi "/services/$service_uuid" | json -Ha metadata.CLOUDAPI_PLUGINS | json -q > "$tmp_plugins_old"
+
+cp "$tmp_plugins_old" "$tmp_plugins_new"
+do_edit
+rm "${tmp_plugins_old:?}" "${tmp_plugins_new:?}"

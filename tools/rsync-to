@@ -1,0 +1,35 @@
+#
+# Copyright (c) 2015, Joyent, Inc.
+#
+
+#
+# Rsync the master in this working copy to the install on the given HN.
+#
+
+#set -o xtrace
+set -o errexit
+
+TOP=$(cd $(dirname $0)/../; pwd)
+NODE=$1
+
+if [[ -z "$CLOUDAPI_ZONE" ]]; then
+    CLOUDAPI_ZONE=$(ssh $NODE "vmadm lookup -1 alias=cloudapi0");
+fi
+echo "CLOUDAPI_ZONE: $CLOUDAPI_ZONE"
+
+rsync -av ${TOP}/ \
+    $NODE:/zones/$CLOUDAPI_ZONE/root/cloudapi/data/ \
+    --exclude "*.tgz" \
+    --exclude /.git/ \
+    --exclude /tools/ \
+    --exclude /tmp/ \
+    --exclude /deps/
+
+state=$(ssh ${NODE} svcs -z ${CLOUDAPI_ZONE} -H -o state \
+    svc:/smartdc/application/cloudapi:cloudapi-8081)
+if [[ "$state" == "maintenance" ]]; then
+    ssh ${NODE} svcadm -z ${CLOUDAPI_ZONE} clear svc:/smartdc/application/cloudapi:cloudapi-*
+else
+    ssh ${NODE} svcadm -z ${CLOUDAPI_ZONE} restart svc:/smartdc/application/cloudapi:cloudapi-*
+fi
+ssh ${NODE} svcadm -z ${CLOUDAPI_ZONE} restart config-agent
