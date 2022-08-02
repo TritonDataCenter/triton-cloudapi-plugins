@@ -6,6 +6,7 @@
 
 /*
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2022 MNX Cloud, Inc.
  */
 
 /*
@@ -21,7 +22,7 @@
  * with a name starting with "t4-":
  *
  *      {
- *          "name": "hvm-disallowed-packages",
+ *          "name": "/data/plugins/hvm-disallowed-packages",
  *          "enabled": true,
  *          "config": {
  *              "package_prefixes": ["t4-"]

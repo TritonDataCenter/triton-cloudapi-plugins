@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright (c) 2018, Brian Bennett.
+ * Copyright 2022, Brian Bennett.
  * Copyright (c) 2018, Marsell Kukuljevic.
  */
 
@@ -22,7 +22,7 @@
  * networks that should have IP spoofing enabled.
  *
  * {
- *    "name": "allow_ip_spoofing",
+ *    "name": "/data/plugins/allow_ip_spoofing",
  *    "enabled": true,
  *    "config": {
  *        "user_networks": {
