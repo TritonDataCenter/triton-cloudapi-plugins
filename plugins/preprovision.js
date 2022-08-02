@@ -28,7 +28,7 @@
  *    "name": "/data/plugins/preprovision",
  *    "enabled": true,
  *    "config": {
- *        "url": "https://billing.example.com",
+ *        "url": "https://approval.example.com",
  *        "code": "Payment Method Required",
  *        "message": "To be able to provision you must update your payment method.",
  *        "allow_list": [
@@ -113,11 +113,11 @@ TritonPreprovisionPlugin.prototype.check = function check(opts, next) {
         ]
     });
 
-    log.debug('billing approval start');
+    log.debug('external approval start');
 
     /*
      * Consult the account whitelist to see if this account is one for which
-     * we do not require billing checks.
+     * we do not require approval checks.
      */
     if (WHITELIST[opts.account.uuid]) {
         if (WHITELIST[opts.account.uuid] === opts.account.login) {
@@ -133,7 +133,7 @@ TritonPreprovisionPlugin.prototype.check = function check(opts, next) {
 
     /*
      * Regardless of what happens during the request to the backend server, we
-     * want a hard upper bound on the length of time the billing check can
+     * want a hard upper bound on the length of time the approval check can
      * take.  If there is a network partition, or the backend service is
      * available but extremely slow, we should fail open.
      */
@@ -142,18 +142,18 @@ TritonPreprovisionPlugin.prototype.check = function check(opts, next) {
         abortFired = true;
         log.error({
             maxDelay: self.triton_pp_maxDelay
-        }, 'billing approval aborted due to timeout (ignoring)');
+        }, 'external approval aborted due to timeout (ignoring)');
         next();
     }, self.triton_pp_maxDelay);
 
     /*
-     * Call the billing server.  If we hit a failure condition that is not
+     * Call the approval server.  If we hit a failure condition that is not
      * understood, allow the system to fail open.  It is of paramount
      * importance that customers are able to provision, even when some of our
      * non-critical backend services are unavailable.
      */
     self.triton_pp_client.get({
-        path: mod_util.format('/billing/approval/%s', opts.account.uuid)
+        path: mod_util.format('/approval/%s', opts.account.uuid)
     }, function checkGet(err, creq, cres, obj) {
         log.trace({
             req: creq,
@@ -161,7 +161,7 @@ TritonPreprovisionPlugin.prototype.check = function check(opts, next) {
             resObj: obj,
             err: err,
             abortFired: abortFired
-        }, 'billing approval response');
+        }, 'external approval response');
 
         if (abortFired) {
             /*
@@ -172,15 +172,15 @@ TritonPreprovisionPlugin.prototype.check = function check(opts, next) {
                 req: creq,
                 res: cres,
                 obj: obj
-            }, 'billing approval check completed after timeout');
+            }, 'external approval check completed after timeout');
             return;
         }
         clearTimeout(abortTimeout);
 
-        if (cres && cres.statusCode === 402) {
+        if (cres && cres.statusCode === 402 || cres.statusCode === 403 ) {
             log.info({
                 res: cres
-            }, 'billing approval check denied');
+            }, 'approval check denied');
             next(new mod_restify.NotAuthorizedError(mod_util.format('%s: %s',
                 CODE, MESSAGE)));
             return;
@@ -193,18 +193,18 @@ TritonPreprovisionPlugin.prototype.check = function check(opts, next) {
         if (err) {
             log.warn({
                 err: err
-            }, 'billing approval check failed (ignoring)');
+            }, 'external approval check failed (ignoring)');
         } else if (!cres.statusCode || cres.statusCode < 200 ||
             cres.statusCode > 299) {
 
             log.warn({
                 res: cres
-            }, 'billing approval unexpected response (ignoring)');
+            }, 'external approval unexpected response (ignoring)');
         } else {
             log.info({
                 statusCode: cres.statusCode,
                 obj: obj
-            }, 'billing approval check granted');
+            }, 'external approval check granted');
         }
 
         next();
