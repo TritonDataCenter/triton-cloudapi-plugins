@@ -5,6 +5,7 @@
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 # Copyright 2021 Joyent, Inc.
+# Copyright 2023 MNX Cloud, Inc.
 
 PATH=/opt/smartdc/bin:$PATH
 
@@ -54,7 +55,7 @@ do_edit() {
 
 show_update_cmd() {
     printf '\nNow run this:\n\n\t'
-    printf 'sdc-sapi /services/%s -X PUT -d '\''%s'\''\n\n' "$service" "$update"
+    printf 'sdc-sapi /services/%s -X PUT -d '\''%s'\''\n\n' "$service_uuid" "$update"
 }
 
 tmp_plugins_old=$(mktemp "/tmp/${service}_plugins.json.XXXXXX")
